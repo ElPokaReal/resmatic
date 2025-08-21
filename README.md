@@ -1,9 +1,9 @@
 # ResMatic
 
-##🖥 Server
+## 🖥 Server
 #### [Server](https://github.com/ElPokaReal/resmatic/tree/main/resmatic-server)
 
-##🌐 Client
+## 🌐 Client
 #### [App](https://github.com/ElPokaReal/resmatic/tree/main/resmatic-app)
 
 ---
