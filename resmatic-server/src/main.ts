@@ -1,4 +1,6 @@
 import { NestFactory } from '@nestjs/core';
+import { VersioningType, ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { AppModule } from './app.module';
 import { networkInterfaces } from 'os';
@@ -8,6 +10,51 @@ async function bootstrap() {
   const port = Number(process.env.PORT ?? 3001);
   // Register Nest-based HTTP logging for all routes
   app.useGlobalInterceptors(new LoggingInterceptor());
+  // API hardening & DX
+  app.enableCors({ origin: true, credentials: true });
+  app.setGlobalPrefix('api');
+  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
+
+  // Validation
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
+
+  // Swagger (Docs)
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('ResMatic API')
+    .setDescription('Documentación de la API de ResMatic')
+    .setVersion('1.0.0')
+    // Access token scheme
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Access Token',
+      },
+      'access-token',
+    )
+    // Refresh token scheme
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Refresh Token',
+      },
+      'refresh-token',
+    )
+    .build();
+  const swaggerDoc = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('docs', app, swaggerDoc, {
+    swaggerOptions: { persistAuthorization: true },
+  });
   await app.listen(port);
 
   const mode = process.env.NODE_ENV ?? 'development';
@@ -87,6 +134,10 @@ async function bootstrap() {
     .find((i) => i && i.family === 'IPv4' && !i.internal)?.address;
   const localURL = `http://localhost:${port}`;
   const lanURL = lan ? `http://${lan}:${port}` : '';
+  const apiLocalURL = `${localURL}/api/v1`;
+  const apiLanURL = lanURL ? `${lanURL}/api/v1` : '';
+  const docsLocalURL = `${localURL}/docs`;
+  const docsLanURL = lanURL ? `${lanURL}/docs` : '';
 
   // Compute fixed left margin so the pizza block is centered as a whole
   const maxPizzaWidth = Math.max(...PIZZA.map((l) => l.length));
@@ -105,8 +156,10 @@ async function bootstrap() {
     box(),
     box(`${YELLOW}Mode:${RESET} ${mode}`),
     box(`${YELLOW}Port:${RESET} ${port}`),
-    box(`${YELLOW}Local:${RESET}  ${GREEN}${localURL}${RESET}`),
-    ...(lanURL ? [box(`${YELLOW}Network:${RESET} ${GREEN}${lanURL}${RESET}`)] : []),
+    box(`${YELLOW}API:${RESET}    ${GREEN}${apiLocalURL}${RESET}`),
+    ...(apiLanURL ? [box(`${YELLOW}API LAN:${RESET} ${GREEN}${apiLanURL}${RESET}`)] : []),
+    box(`${YELLOW}Docs:${RESET}   ${GREEN}${docsLocalURL}${RESET}`),
+    ...(docsLanURL ? [box(`${YELLOW}Docs LAN:${RESET} ${GREEN}${docsLanURL}${RESET}`)] : []),
     box(`${YELLOW}Runtime:${RESET} ${runtime}`),
     footer,
     '',
