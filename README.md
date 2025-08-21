@@ -1,10 +1,10 @@
 # ResMatic
 
 ## Server
-#### [Server](https://github.com/ElPokaReal/resmatic-server)
+#### [Server](https://github.com/ElPokaReal/tree/main/resmatic-server)
 
 ## Client
-#### [App](https://github.com/ElPokaReal/resmatic-app)
+#### [App](https://github.com/ElPokaReal/tree/main/resmatic-app)
 
 ---
 
