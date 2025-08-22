@@ -78,6 +78,11 @@ export class AuthService {
     }
   }
 
+  async logout(userId: string) {
+    await this.refreshTokens.revokeAllForUser(userId);
+    return { ok: true };
+  }
+
   private parseDurationToMs(v: string): number {
     // Soporta "15m", "7d", "1h", "30s"
     const m = /^\s*(\d+)\s*([smhd])\s*$/i.exec(v);

@@ -42,4 +42,13 @@ export class AuthController {
   async adminCheck() {
     return { ok: true, message: 'Admin access granted' };
   }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  async logout(@Req() req: any) {
+    const userId = req.user?.id as string | undefined;
+    return this.auth.logout(userId || '');
+  }
 }
