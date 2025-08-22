@@ -31,4 +31,20 @@ export class RefreshTokensService {
   async revokeAllForUser(userId: string) {
     await this.prisma.refreshToken.updateMany({ where: { userId, revoked: false }, data: { revoked: true } });
   }
+
+  async listActiveForUser(userId: string) {
+    return this.prisma.refreshToken.findMany({
+      where: { userId, revoked: false },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+  }
+
+  async enforceSessionLimit(userId: string, limit: number) {
+    if (!Number.isFinite(limit) || limit <= 0) return; // disabled if <= 0
+    const active = await this.listActiveForUser(userId);
+    if (active.length <= limit) return;
+    const revokeIds = active.slice(limit).map((t) => t.id);
+    await this.prisma.refreshToken.updateMany({ where: { id: { in: revokeIds } }, data: { revoked: true } });
+  }
 }

@@ -18,6 +18,9 @@ export class RolesGuard implements CanActivate {
     const user = request.user as { role?: Role } | undefined;
     if (!user?.role) return false;
 
+    // Global ADMIN bypass for any role-protected endpoint
+    if (user.role === 'ADMIN') return true;
+
     return requiredRoles.includes(user.role);
   }
 }

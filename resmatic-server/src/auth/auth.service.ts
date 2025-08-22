@@ -5,6 +5,7 @@ import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 import type { Role } from '../users/user.entity';
 import { RefreshTokensService } from './refresh-tokens.service';
+import { randomUUID } from 'crypto';
 
 export interface JwtPayload {
   sub: string; // user id
@@ -29,6 +30,9 @@ export class AuthService {
     const refreshExp = this.cfg.get<string>('JWT_REFRESH_EXPIRES_IN') || '7d';
     const expiresAt = new Date(Date.now() + this.parseDurationToMs(refreshExp));
     await this.refreshTokens.store(user.id, tokens.refreshToken, expiresAt);
+    // Optional device session policy: limit active refresh tokens per user
+    const maxSessions = Number(this.cfg.get<string>('AUTH_MAX_SESSIONS') ?? '0');
+    await this.refreshTokens.enforceSessionLimit(user.id, maxSessions);
     return { user, ...tokens };
   }
 
@@ -41,10 +45,12 @@ export class AuthService {
     const accessToken = await this.jwt.signAsync(payload, {
       secret: accessSecret,
       expiresIn: accessExp,
+      jwtid: randomUUID(),
     });
     const refreshToken = await this.jwt.signAsync(payload, {
       secret: refreshSecret,
       expiresIn: refreshExp,
+      jwtid: randomUUID(),
     });
     return { accessToken, refreshToken };
   }
@@ -72,6 +78,8 @@ export class AuthService {
       const refreshExp = this.cfg.get<string>('JWT_REFRESH_EXPIRES_IN') || '7d';
       const expiresAt = new Date(Date.now() + this.parseDurationToMs(refreshExp));
       await this.refreshTokens.store(user.id, tokens.refreshToken, expiresAt);
+      const maxSessions = Number(this.cfg.get<string>('AUTH_MAX_SESSIONS') ?? '0');
+      await this.refreshTokens.enforceSessionLimit(user.id, maxSessions);
       return { user: publicUser, ...tokens };
     } catch (e) {
       throw new UnauthorizedException('Refresh token inválido');
