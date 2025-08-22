@@ -14,6 +14,7 @@ Fecha: 2025-08-22
   - E2E Orders iniciales: crear pedido, add/update/delete ítems (recalcula total), transiciones de estado, eventos y sanity RBAC (WAITER).
   - Prisma: migración a `prisma.config.ts` y scripts con `dotenv-cli` (generate/migrate/seed OK).
   - Menús: controller actualizado con tipos Prisma (sin `as any`) para updates de `Menu` y `MenuSection`.
+  - Docker (dev): `docker-compose.yml` con `db` (Postgres), `server` (Nest+Bun) y `app` (Next+Bun); `.dockerignore` en `resmatic-server/`; `README.md` actualizado con comandos.
 
 ## En curso
 - Menú/Carta: CRUD de `Menu`/`MenuSection`/`MenuItem` (backend) en `src/menus/`.
@@ -21,7 +22,7 @@ Fecha: 2025-08-22
 
 ## Próximos pasos
 - Suscripciones (backend): `Plan`, `Subscription`, `UsageCounter` + enforcement de límites.
-- Deploy/Entornos: `.env` por entorno, Dockerfile, CI (lint/test/migrate) y staging.
+- Deploy/Entornos: preparar Dockerfile(s) de producción y pipeline CI (lint/test/migrate); staging.
 
 ## Endpoints de Orders (v1)
 - `GET /restaurants/:id/orders`

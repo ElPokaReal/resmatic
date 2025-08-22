@@ -33,6 +33,7 @@ Este roadmap cubre la evolución del backend para gestionar usuarios, restaurant
   - Prisma: `bun run prisma:generate`, `bun run prisma:migrate --name add_orders`, `bun run prisma:seed` ejecutados.
   - Configuración: migrado a `prisma.config.ts` y actualización de scripts para cargar `.env` con `dotenv-cli` (generate/migrate/seed verificados).
   - Menús: `menus.controller.ts` refactorizado para usar tipos de Prisma (`MenuUpdateInput`, `MenuSectionUpdateInput`) sin `as any`.
+  - Contenedores (desarrollo): `docker-compose.yml` con servicios `db` (Postgres 16), `server` (Nest+Bun con hot-reload) y `app` (Next+Bun); `.dockerignore` en `resmatic-server/`; `README.md` actualizado con comandos. Pendiente: Dockerfile(s) de producción y pipeline CI.
 - **[en curso]**
   - Menú y Carta: CRUD de `Menu`/`MenuSection`/`MenuItem` (backend) — en construcción.
   - Validaciones adicionales y ejemplos en Swagger para Orders.

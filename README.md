@@ -82,6 +82,58 @@ bun run dev
 - App (Next): http://localhost:3000
 - API (Nest): http://localhost:3001
 
+## Ejecutar con Docker (desarrollo)
+
+- Requisitos: Docker Desktop (Windows con WSL2).
+
+- Levantar servicios:
+```bash
+docker compose up -d
+```
+
+- Ver logs:
+```bash
+docker compose logs -f server
+docker compose logs -f app
+```
+
+- Parar:
+```bash
+docker compose stop
+```
+
+- Apagar y borrar contenedores (mantiene datos DB):
+```bash
+docker compose down
+```
+
+- Apagar y borrar TODO (incl. datos DB):
+```bash
+docker compose down -v
+```
+
+- URLs:
+  - App: http://localhost:3000
+  - API: http://localhost:3001
+  - Swagger: http://localhost:3001/docs
+
+- Notas:
+  - `NEXT_PUBLIC_API_URL` está configurado en `docker-compose.yml` como `http://localhost:3001/api/v1`.
+  - Hot-reload activo para frontend (Next) y backend (Nest) en desarrollo.
+
+- Comandos dentro de contenedores:
+```bash
+# Shell en el backend (Nest)
+docker compose exec server sh
+# dentro del contenedor:
+bun run test:e2e
+bunx prisma migrate dev --name <nombre>
+bun run prisma:seed
+
+# Shell en el frontend (Next)
+docker compose exec app sh
+```
+
 ## Scripts útiles
 
 - `resmatic-server/`

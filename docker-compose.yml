@@ -1,0 +1,73 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: resmatic-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: resmatic
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    image: oven/bun:1
+    container_name: resmatic-server
+    working_dir: /app
+    volumes:
+      - ./resmatic-server:/app
+      - /app/node_modules
+    environment:
+      PORT: 3001
+      NODE_ENV: development
+      NEST_LOG_FORMAT: short
+      JWT_ACCESS_SECRET: dev_access_secret
+      JWT_REFRESH_SECRET: dev_refresh_secret
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      DATABASE_URL: postgresql://postgres:admin123@db:5432/resmatic?schema=public
+      AUTH_MAX_SESSIONS: "0"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    command: >
+      sh -c "
+      bun install &&
+      bunx prisma generate &&
+      bunx prisma migrate dev &&
+      bunx prisma db seed &&
+      bun run start:dev
+      "
+    restart: unless-stopped
+
+  app:
+    image: oven/bun:1
+    container_name: resmatic-app
+    working_dir: /app
+    volumes:
+      - ./resmatic-app:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
+    depends_on:
+      - server
+    ports:
+      - "3000:3000"
+    command: >
+      sh -c "
+      bun install &&
+      bun run dev -- --hostname 0.0.0.0
+      "
+    restart: unless-stopped
+
+volumes:
+  db_data:
