@@ -26,7 +26,7 @@ Este roadmap cubre la evolución del backend para gestionar usuarios, restaurant
 5) Deploy y entornos
    - `.env` por entorno, Dockerfile, CI (lint/test/migrate) y staging.
 
-## Progreso (2025-08-22)
+## Progreso (2025-08-25)
 - **[logros]**
   - Pedidos (Orders): agregados modelos Prisma `Order`, `OrderItem`, `OrderEvent` con back-relations, migración aplicada y Prisma Client regenerado.
   - Backend: creado `OrdersModule` (`src/orders/`) con service, controller y DTOs; rutas `v1/restaurants/:id/orders/*` con guards (`JwtAuthGuard`, `RestaurantAccessGuard`) y RBAC por rol del restaurante.
@@ -34,14 +34,19 @@ Este roadmap cubre la evolución del backend para gestionar usuarios, restaurant
   - Configuración: migrado a `prisma.config.ts` y actualización de scripts para cargar `.env` con `dotenv-cli` (generate/migrate/seed verificados).
   - Menús: `menus.controller.ts` refactorizado para usar tipos de Prisma (`MenuUpdateInput`, `MenuSectionUpdateInput`) sin `as any`.
   - Contenedores (desarrollo): `docker-compose.yml` con servicios `db` (Postgres 16), `server` (Nest+Bun con hot-reload) y `app` (Next+Bun); `.dockerignore` en `resmatic-server/`; `README.md` actualizado con comandos. Pendiente: Dockerfile(s) de producción y pipeline CI.
+  - E2E de Menús agregado: `resmatic-server/test/menus.e2e-spec.ts` (CRUD, validaciones 400/404 y RBAC OWNER/MANAGER/WAITER).
+  - Swagger/Orders: montos `total` y `unitPrice` documentados como string en DTOs (`order.dto.ts`, `order-item.dto.ts`).
+  - CI Backend: workflow `.github/workflows/backend-ci.yml` con Bun que corre lint, migraciones, seed y E2E contra Postgres de servicio.
+  - Dockerfile de producción backend: `resmatic-server/Dockerfile` multi-stage (build + runtime) con Prisma generate y `nest build`.
 - **[en curso]**
   - Menú y Carta: CRUD de `Menu`/`MenuSection`/`MenuItem` (backend) — en construcción.
   - Validaciones adicionales y ejemplos en Swagger para Orders.
-  - E2E de Menús: cubrir flujos CRUD, validaciones 400/404 y RBAC OWNER/MANAGER/WAITER.
+  - E2E de Orders: ampliando casos negativos (400/404/403) y preparando tests de estados y recálculo de totales.
+  - ~~E2E de Menús: cubrir flujos CRUD, validaciones 400/404 y RBAC OWNER/MANAGER/WAITER.~~
 - **[próximos pasos]**
   - Pruebas E2E de Orders (casos positivos/negativos; transiciones de estado; recalculo de totales; RBAC por restaurante).
   - Verificar y ajustar DTOs/respuestas de Orders en Swagger.
-  - Preparar CI (lint/test/migrate) y Dockerfile de backend.
+  - Preparar staging y pipeline de deploy (migrate deploy en release) y publicación de imágenes.
 
 ---
 

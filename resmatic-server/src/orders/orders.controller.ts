@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiBearerAuth, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { ApiBadRequestResponse, ApiBearerAuth, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RestaurantAccessGuard } from '../restaurants/guards/restaurant-access.guard';
 import { RestaurantRoles } from '../restaurants/decorators/restaurant-roles.decorator';
@@ -13,6 +13,7 @@ import { OrderItemDto } from './dto/order-item.dto';
 import { ChangeStatusDto } from './dto/change-status.dto';
 import { OrderEventDto } from './dto/order-event.dto';
 import { OkResponseDto } from '../common/dto/ok-response.dto';
+import { Prisma } from '@prisma/client';
 
 @ApiTags('orders')
 @ApiBearerAuth('access-token')
@@ -25,6 +26,8 @@ export class OrdersController {
   @UseGuards(RestaurantAccessGuard)
   @ApiOperation({ summary: 'List orders for a restaurant' })
   @ApiOkResponse({ type: OrderDto, isArray: true })
+  @ApiUnauthorizedResponse()
+  @ApiForbiddenResponse()
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
   list(@Param('id') id: string) {
     return this.service.list(id);
@@ -34,7 +37,7 @@ export class OrdersController {
   @UseGuards(RestaurantAccessGuard)
   @RestaurantRoles('OWNER', 'MANAGER', 'WAITER')
   @ApiOperation({ summary: 'Create order - OWNER/MANAGER/WAITER' })
-  @ApiOkResponse({ type: OrderDto })
+  @ApiCreatedResponse({ type: OrderDto })
   @ApiForbiddenResponse()
   @ApiUnauthorizedResponse()
   @ApiBadRequestResponse()
@@ -48,6 +51,7 @@ export class OrdersController {
   @ApiOperation({ summary: 'Get one order' })
   @ApiOkResponse({ type: OrderDto })
   @ApiUnauthorizedResponse()
+  @ApiForbiddenResponse()
   @ApiNotFoundResponse()
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
   @ApiParam({ name: 'orderId', example: 'ckv9h1orde0000xyz123' })
@@ -63,18 +67,26 @@ export class OrdersController {
   @ApiForbiddenResponse()
   @ApiUnauthorizedResponse()
   @ApiBadRequestResponse()
+  @ApiNotFoundResponse()
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
   @ApiParam({ name: 'orderId', example: 'ckv9h1orde0000xyz123' })
   update(@Param('id') id: string, @Param('orderId') orderId: string, @Body() dto: UpdateOrderDto) {
-    return this.service.update(id, orderId, dto as any);
+    const data: Prisma.OrderUpdateInput = {};
+    if (dto.tableNumber !== undefined) data.tableNumber = dto.tableNumber;
+    if (dto.customerName !== undefined) data.customerName = dto.customerName;
+    if (dto.notes !== undefined) data.notes = dto.notes;
+    return this.service.update(id, orderId, data);
   }
 
   @Post(':orderId/status')
   @UseGuards(RestaurantAccessGuard)
   @RestaurantRoles('OWNER', 'MANAGER', 'WAITER')
   @ApiOperation({ summary: 'Change order status - OWNER/MANAGER/WAITER' })
-  @ApiOkResponse({ type: OrderDto })
+  @ApiCreatedResponse({ type: OrderDto })
   @ApiBadRequestResponse()
+  @ApiUnauthorizedResponse()
+  @ApiForbiddenResponse()
+  @ApiNotFoundResponse()
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
   @ApiParam({ name: 'orderId', example: 'ckv9h1orde0000xyz123' })
   changeStatus(@Param('id') id: string, @Param('orderId') orderId: string, @Body() dto: ChangeStatusDto) {
@@ -85,6 +97,9 @@ export class OrdersController {
   @UseGuards(RestaurantAccessGuard)
   @ApiOperation({ summary: 'List order events' })
   @ApiOkResponse({ type: OrderEventDto, isArray: true })
+  @ApiUnauthorizedResponse()
+  @ApiForbiddenResponse()
+  @ApiNotFoundResponse()
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
   @ApiParam({ name: 'orderId', example: 'ckv9h1orde0000xyz123' })
   listEvents(@Param('id') id: string, @Param('orderId') orderId: string) {
@@ -95,8 +110,11 @@ export class OrdersController {
   @UseGuards(RestaurantAccessGuard)
   @RestaurantRoles('OWNER', 'MANAGER', 'WAITER')
   @ApiOperation({ summary: 'Add item to order - OWNER/MANAGER/WAITER' })
-  @ApiOkResponse({ type: OrderDto })
+  @ApiCreatedResponse({ type: OrderDto })
   @ApiBadRequestResponse()
+  @ApiUnauthorizedResponse()
+  @ApiForbiddenResponse()
+  @ApiNotFoundResponse()
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
   @ApiParam({ name: 'orderId', example: 'ckv9h1orde0000xyz123' })
   addItem(@Param('id') id: string, @Param('orderId') orderId: string, @Body() dto: CreateOrderItemDto) {
@@ -109,6 +127,9 @@ export class OrdersController {
   @ApiOperation({ summary: 'Update order item - OWNER/MANAGER/WAITER' })
   @ApiOkResponse({ type: OrderDto })
   @ApiBadRequestResponse()
+  @ApiUnauthorizedResponse()
+  @ApiForbiddenResponse()
+  @ApiNotFoundResponse()
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
   @ApiParam({ name: 'orderId', example: 'ckv9h1orde0000xyz123' })
   @ApiParam({ name: 'orderItemId', example: 'ckv9h1orit0000xyz123' })
@@ -126,6 +147,9 @@ export class OrdersController {
   @RestaurantRoles('OWNER', 'MANAGER', 'WAITER')
   @ApiOperation({ summary: 'Delete order item - OWNER/MANAGER/WAITER' })
   @ApiOkResponse({ type: OkResponseDto })
+  @ApiUnauthorizedResponse()
+  @ApiForbiddenResponse()
+  @ApiNotFoundResponse()
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
   @ApiParam({ name: 'orderId', example: 'ckv9h1orde0000xyz123' })
   @ApiParam({ name: 'orderItemId', example: 'ckv9h1orit0000xyz123' })

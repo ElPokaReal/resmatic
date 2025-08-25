@@ -9,8 +9,8 @@ export class ItemDto {
   name!: string;
   @ApiProperty({ required: false })
   description?: string | null;
-  @ApiProperty({ example: 9.99 })
-  price!: any; // Decimal serialized
+  @ApiProperty({ example: '9.99', type: String })
+  price!: string; // Decimal serialized as string
   @ApiProperty({ enum: ['ACTIVE', 'INACTIVE'] })
   status!: 'ACTIVE' | 'INACTIVE';
   @ApiProperty({ type: [String] })

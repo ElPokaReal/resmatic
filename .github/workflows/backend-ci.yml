@@ -1,0 +1,73 @@
+name: backend-ci
+
+on:
+  push:
+    paths:
+      - 'resmatic-server/**'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    paths:
+      - 'resmatic-server/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: resmatic
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres" 
+          --health-interval=10s 
+          --health-timeout=5s 
+          --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Create .env for server
+        working-directory: resmatic-server
+        run: |
+          cp .env.example .env
+          sed -i 's#^DATABASE_URL=.*#DATABASE_URL=postgresql://postgres:postgres@localhost:5432/resmatic?schema=public#' .env
+
+      - name: Install dependencies
+        working-directory: resmatic-server
+        run: bun install --ci
+
+      - name: Generate Prisma Client
+        working-directory: resmatic-server
+        run: bun run prisma:generate
+
+      - name: Run migrations
+        working-directory: resmatic-server
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/resmatic?schema=public
+        run: bun run prisma:migrate
+
+      - name: Seed database
+        working-directory: resmatic-server
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/resmatic?schema=public
+        run: bun run prisma:seed
+
+      - name: Lint
+        working-directory: resmatic-server
+        run: bun run lint
+
+      - name: Run E2E tests
+        working-directory: resmatic-server
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/resmatic?schema=public
+        run: bun run test:e2e

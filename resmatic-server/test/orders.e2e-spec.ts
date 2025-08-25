@@ -42,7 +42,12 @@ describe('Orders E2E', () => {
   let menuId = '';
   let sectionId = '';
   let itemId = '';
+  let itemId2 = '';
   let orderId = '';
+  let restaurantId2 = '';
+  let menuId2 = '';
+  let sectionId2 = '';
+  let itemOtherRestaurantId = '';
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -86,6 +91,13 @@ describe('Orders E2E', () => {
         await prisma.order.deleteMany({ where: { restaurantId } }).catch(() => void 0);
         await prisma.menu.deleteMany({ where: { restaurantId } }).catch(() => void 0);
         await prisma.restaurant.delete({ where: { id: restaurantId } }).catch(() => void 0);
+      }
+      if (restaurantId2) {
+        await prisma.staffInvite.deleteMany({ where: { restaurantId: restaurantId2 } }).catch(() => void 0);
+        await prisma.restaurantMember.deleteMany({ where: { restaurantId: restaurantId2 } }).catch(() => void 0);
+        await prisma.order.deleteMany({ where: { restaurantId: restaurantId2 } }).catch(() => void 0);
+        await prisma.menu.deleteMany({ where: { restaurantId: restaurantId2 } }).catch(() => void 0);
+        await prisma.restaurant.delete({ where: { id: restaurantId2 } }).catch(() => void 0);
       }
       // Remove test staff user
       const staff = await prisma.user.findUnique({ where: { email: staffEmail } });
@@ -135,7 +147,7 @@ describe('Orders E2E', () => {
       .expect(201);
     sectionId = sRes.body.id;
 
-    // create item
+    // create item #1
     const iRes = await request(app.getHttpServer())
       .post(`${menusBase(restaurantId)}/${menuId}/sections/${sectionId}/items`)
       .set('Authorization', `Bearer ${adminAccess}`)
@@ -143,7 +155,47 @@ describe('Orders E2E', () => {
       .expect(201);
     itemId = iRes.body.id;
 
-    expect(menuId && sectionId && itemId).toBeTruthy();
+    // create item #2 (same restaurant) for multi-item totals
+    const i2Res = await request(app.getHttpServer())
+      .post(`${menusBase(restaurantId)}/${menuId}/sections/${sectionId}/items`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ name: 'Fries', price: 4.5 })
+      .expect(201);
+    itemId2 = i2Res.body.id;
+
+    expect(menuId && sectionId && itemId && itemId2).toBeTruthy();
+  });
+
+  it('restaurants: create second restaurant with its own menu and item', async () => {
+    const r2 = await request(app.getHttpServer())
+      .post(`${restaurantsBase}`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ name: 'Orders E2E R2' })
+      .expect(201);
+    restaurantId2 = r2.body.id;
+
+    const m2 = await request(app.getHttpServer())
+      .post(menusBase(restaurantId2))
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ name: 'Menu R2' })
+      .expect(201);
+    menuId2 = m2.body.id;
+
+    const s2 = await request(app.getHttpServer())
+      .post(`${menusBase(restaurantId2)}/${menuId2}/sections`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ name: 'Section R2' })
+      .expect(201);
+    sectionId2 = s2.body.id;
+
+    const iR2 = await request(app.getHttpServer())
+      .post(`${menusBase(restaurantId2)}/${menuId2}/sections/${sectionId2}/items`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ name: 'R2 Drink', price: 5.25 })
+      .expect(201);
+    itemOtherRestaurantId = iR2.body.id;
+
+    expect(restaurantId2 && menuId2 && sectionId2 && itemOtherRestaurantId).toBeTruthy();
   });
 
   it('orders: create as OWNER', async () => {
@@ -195,6 +247,65 @@ describe('Orders E2E', () => {
     expect(parseFloat(getRes.body.total)).toBeCloseTo(0, 2);
   });
 
+  it('orders: total recalculation with multiple items and reordering', async () => {
+    // create a fresh order
+    const oRes = await request(app.getHttpServer())
+      .post(ordersBase(restaurantId))
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ tableNumber: 6, customerName: 'Charlie' })
+      .expect(201);
+    const oid = oRes.body.id;
+
+    // add item1 qty 2 -> 19.98
+    const add1 = await request(app.getHttpServer())
+      .post(`${ordersBase(restaurantId)}/${oid}/items`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ menuItemId: itemId, quantity: 2 })
+      .expect(201);
+    expect(parseFloat(add1.body.total)).toBeCloseTo(19.98, 2);
+
+    // add item2 qty 3 -> +13.50 = 33.48
+    const add2 = await request(app.getHttpServer())
+      .post(`${ordersBase(restaurantId)}/${oid}/items`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ menuItemId: itemId2, quantity: 3 })
+      .expect(201);
+    expect(parseFloat(add2.body.total)).toBeCloseTo(33.48, 2);
+
+    // fetch items
+    const items = await prisma.orderItem.findMany({ where: { orderId: oid }, orderBy: { createdAt: 'asc' } });
+    const itemA = items[0];
+    const itemB = items[1];
+
+    // sanity check: total remains the same if we perform a no-op read
+    const noOpGet = await request(app.getHttpServer())
+      .get(`${ordersBase(restaurantId)}/${oid}`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .expect(200);
+    expect(parseFloat(noOpGet.body.total)).toBeCloseTo(33.48, 2);
+
+    // reduce qty of item2 to 1 -> 19.98 + 4.50 = 24.48
+    const upQty = await request(app.getHttpServer())
+      .patch(`${ordersBase(restaurantId)}/${oid}/items/${itemB.id}`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ quantity: 1 })
+      .expect(200);
+    expect(parseFloat(upQty.body.total)).toBeCloseTo(24.48, 2);
+
+    // delete item1 -> leaves 4.50
+    const del1 = await request(app.getHttpServer())
+      .delete(`${ordersBase(restaurantId)}/${oid}/items/${itemA.id}`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .expect(200);
+    expect(del1.body).toHaveProperty('ok', true);
+
+    const getFinal = await request(app.getHttpServer())
+      .get(`${ordersBase(restaurantId)}/${oid}`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .expect(200);
+    expect(parseFloat(getFinal.body.total)).toBeCloseTo(4.5, 2);
+  });
+
   it('orders: change status and list events', async () => {
     const transitions = ['CONFIRMED', 'IN_PROGRESS', 'READY', 'COMPLETED'];
     for (const st of transitions) {
@@ -213,6 +324,30 @@ describe('Orders E2E', () => {
     const events = evRes.body as Array<any>;
     expect(events.length).toBeGreaterThanOrEqual(transitions.length);
     expect(events[events.length - 1].status).toBe('COMPLETED');
+  });
+
+  it('orders: cancel order adds event and sets status', async () => {
+    // create order to cancel
+    const resOrder = await request(app.getHttpServer())
+      .post(ordersBase(restaurantId))
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ tableNumber: 8, customerName: 'Daisy' })
+      .expect(201);
+    const oid = resOrder.body.id;
+
+    const res = await request(app.getHttpServer())
+      .post(`${ordersBase(restaurantId)}/${oid}/status`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ status: 'CANCELED', message: 'Customer left' })
+      .expect(201);
+    expect(res.body).toHaveProperty('status', 'CANCELED');
+
+    const evRes = await request(app.getHttpServer())
+      .get(`${ordersBase(restaurantId)}/${oid}/events`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .expect(200);
+    const events = evRes.body as Array<any>;
+    expect(events[events.length - 1].status).toBe('CANCELED');
   });
 
   it('rbac: invite staff as WAITER and allow creating order', async () => {
@@ -246,7 +381,76 @@ describe('Orders E2E', () => {
     expect(res.body).toHaveProperty('id');
   });
 
+  it('rbac: waiter cannot list orders for other restaurant -> 403', async () => {
+    await request(app.getHttpServer())
+      .get(ordersBase(restaurantId2))
+      .set('Authorization', `Bearer ${staffAccess}`)
+      .expect(403);
+  });
+
   it('negative: no auth returns 401 on list orders', async () => {
     await request(app.getHttpServer()).get(ordersBase(restaurantId)).expect(401);
+  });
+
+  it('negative: add item with quantity 0 -> 400', async () => {
+    const resOrder = await request(app.getHttpServer())
+      .post(ordersBase(restaurantId))
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ tableNumber: 9 })
+      .expect(201);
+    const oid = resOrder.body.id;
+
+    await request(app.getHttpServer())
+      .post(`${ordersBase(restaurantId)}/${oid}/items`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ menuItemId: itemId, quantity: 0 })
+      .expect(400);
+  });
+
+  it('negative: add item with non-existent menuItemId -> 404', async () => {
+    const resOrder = await request(app.getHttpServer())
+      .post(ordersBase(restaurantId))
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ tableNumber: 10 })
+      .expect(201);
+    const oid = resOrder.body.id;
+
+    await request(app.getHttpServer())
+      .post(`${ordersBase(restaurantId)}/${oid}/items`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ menuItemId: 'ck_fake_menu_item', quantity: 1 })
+      .expect(404);
+  });
+
+  it('negative: getOne with wrong orderId -> 404', async () => {
+    await request(app.getHttpServer())
+      .get(`${ordersBase(restaurantId)}/ck_fake_order_id`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .expect(404);
+  });
+
+  it('rbac: waiter cannot update order -> 403', async () => {
+    // Create order as OWNER
+    const resOrder = await request(app.getHttpServer())
+      .post(ordersBase(restaurantId))
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ tableNumber: 11 })
+      .expect(201);
+    const oid = resOrder.body.id;
+
+    // Ensure waiter logged in (staffAccess set earlier)
+    await request(app.getHttpServer())
+      .patch(`${ordersBase(restaurantId)}/${oid}`)
+      .set('Authorization', `Bearer ${staffAccess}`)
+      .send({ notes: 'try update as waiter' })
+      .expect(403);
+  });
+
+  it('scoping: cannot add item from other restaurant into this order -> 404', async () => {
+    await request(app.getHttpServer())
+      .post(`${ordersBase(restaurantId)}/${orderId}/items`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ menuItemId: itemOtherRestaurantId, quantity: 1 })
+      .expect(404);
   });
 });

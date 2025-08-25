@@ -9,8 +9,8 @@ export class OrderItemDto {
   menuItemId!: string;
   @ApiProperty()
   nameSnapshot!: string;
-  @ApiProperty({ example: 9.99 })
-  unitPrice!: any; // Decimal serialized
+  @ApiProperty({ example: '9.99' })
+  unitPrice!: string; // Decimal serialized as string
   @ApiProperty({ example: 1 })
   quantity!: number;
   @ApiProperty({ required: false })

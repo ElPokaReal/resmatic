@@ -14,8 +14,8 @@ export class OrderDto {
   customerName?: string | null;
   @ApiProperty({ required: false })
   notes?: string | null;
-  @ApiProperty({ example: 0 })
-  total!: any; // Decimal serialized
+  @ApiProperty({ example: '0.00' })
+  total!: string; // Decimal serialized as string
   @ApiProperty()
   createdAt!: Date;
   @ApiProperty()

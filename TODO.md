@@ -1,6 +1,6 @@
 # TODO / Progreso
 
-Fecha: 2025-08-22
+Fecha: 2025-08-25
 
 ## Hecho
 - Auth + Roles globales (`ADMIN`, `USER`).
@@ -15,14 +15,20 @@ Fecha: 2025-08-22
   - Prisma: migración a `prisma.config.ts` y scripts con `dotenv-cli` (generate/migrate/seed OK).
   - Menús: controller actualizado con tipos Prisma (sin `as any`) para updates de `Menu` y `MenuSection`.
   - Docker (dev): `docker-compose.yml` con `db` (Postgres), `server` (Nest+Bun) y `app` (Next+Bun); `.dockerignore` en `resmatic-server/`; `README.md` actualizado con comandos.
+  - E2E de Menús: agregado `resmatic-server/test/menus.e2e-spec.ts` (CRUD, validaciones 400/404 y RBAC OWNER/MANAGER/WAITER).
+- Swagger/Orders: `total` (Order) y `unitPrice` (OrderItem) documentados como string con ejemplos en DTOs.
+- CI backend: workflow `.github/workflows/backend-ci.yml` con Bun (lint, migraciones, seed, E2E contra Postgres de servicio).
+- Dockerfile producción backend: `resmatic-server/Dockerfile` multi-stage (build + runtime) con `prisma generate` y `nest build`.
+-
 
 ## En curso
 - Menú/Carta: CRUD de `Menu`/`MenuSection`/`MenuItem` (backend) en `src/menus/`.
 - Swagger: ejemplos/validaciones adicionales para Orders.
+- Orders E2E: ampliación de casos negativos (400/404/403) y preparación de transiciones de estado y recálculo de totales.
 
 ## Próximos pasos
 - Suscripciones (backend): `Plan`, `Subscription`, `UsageCounter` + enforcement de límites.
-- Deploy/Entornos: preparar Dockerfile(s) de producción y pipeline CI (lint/test/migrate); staging.
+- Deploy/Entornos: preparar staging y pipeline de deploy (migrate deploy en release) y publicación de imágenes.
 
 ## Endpoints de Orders (v1)
 - `GET /restaurants/:id/orders`
