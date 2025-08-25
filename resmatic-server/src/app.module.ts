@@ -9,6 +9,7 @@ import { PrismaModule } from './common/prisma/prisma.module';
 import { RestaurantsModule } from './restaurants/restaurant.module';
 import { MenusModule } from './menus/menus.module';
 import { OrdersModule } from './orders/orders.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { OrdersModule } from './orders/orders.module';
     RestaurantsModule,
     MenusModule,
     OrdersModule,
+    SubscriptionsModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],
