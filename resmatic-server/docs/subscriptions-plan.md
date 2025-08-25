@@ -134,6 +134,25 @@ Swagger: campos monetarios como string en respuestas; ejemplos consistentes ("9.
 
 ---
 
+## Planes (MVP) — Set A (sin límite de pedidos)
+- Entrante (`ENTRANTE`) — "19.00"/mes — 14 días gratis
+  - Hasta 1 restaurante, hasta 5 usuarios
+  - Menús/secciones/ítems ilimitados, gestión de órdenes completa
+  - Soporte por email, branding básico
+- Plato Fuerte (`PLATO_FUERTE`) — "49.00"/mes
+  - Hasta 3 restaurantes, hasta 20 usuarios
+  - Roles/Permisos avanzados, exportaciones (CSV/PDF), analíticas básicas y reportes programados
+  - Soporte estándar
+- Banquete (`BANQUETE`) — "99.00"/mes
+  - Restaurantes y usuarios ilimitados
+  - Analíticas avanzadas/panel ejecutivo, branding/tema personalizado, subdominio propio
+  - Integraciones (API/Webhooks/SSO — futuro), soporte prioritario
+
+Notas:
+- Sin límites de pedidos por plan. `UsageCounter` se usa para métricas/analíticas, no para bloquear uso en el MVP.
+
+---
+
 ## E2E (escenarios mínimos)
 1. Crear suscripción ACTIVA para restaurante con plan válido.
 2. Impedir segunda suscripción ACTIVA (409 o 400) en mismo restaurante.
@@ -151,7 +170,7 @@ Swagger: campos monetarios como string en respuestas; ejemplos consistentes ("9.
 - Índices:
   - `Subscription(restaurantId, status)` parcial por ACTIVE (o constraint lógica en servicio).
   - `UsageCounter(subscriptionId, metric, periodStart, periodEnd)` único.
-- Seed: planes por defecto (p.ej., "BASIC", "PRO").
+- Seed: planes por defecto: `ENTRANTE`, `PLATO_FUERTE`, `BANQUETE`.
 
 ---
 

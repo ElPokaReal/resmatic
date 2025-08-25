@@ -64,6 +64,7 @@ model Restaurant {
   invites   StaffInvite[]
   menus     Menu[]
   orders    Order[]
+  subscriptions Subscription[]
 }
 
 model RestaurantMember {
@@ -213,4 +214,60 @@ model OrderEvent {
 
   @@index([orderId])
   @@index([status])
+}
+
+// --- Subscriptions ---
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+}
+
+model Plan {
+  id           String    @id @default(cuid())
+  code         String    @unique
+  name         String
+  description  String?
+  monthlyPrice Decimal   @db.Decimal(10, 2)
+  features     String[]
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id           String              @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  planId       String
+  plan         Plan                @relation(fields: [planId], references: [id], onDelete: Restrict)
+  status       SubscriptionStatus  @default(ACTIVE)
+  startsAt     DateTime            @default(now())
+  endsAt       DateTime?
+  canceledAt   DateTime?
+  trialEndsAt  DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  usageCounters UsageCounter[]
+
+  @@index([restaurantId])
+  @@index([planId])
+  @@index([status])
+}
+
+model UsageCounter {
+  id              String        @id @default(cuid())
+  subscriptionId  String
+  subscription    Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  metric          String
+  periodStart     DateTime
+  periodEnd       DateTime
+  value           Int           @default(0)
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([subscriptionId, metric, periodStart, periodEnd])
+  @@index([subscriptionId])
 }
