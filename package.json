@@ -1,0 +1,13 @@
+{
+  "name": "resmatic-monorepo",
+  "private": true,
+  "scripts": {
+    "backend": "node scripts/resmatic-cli.cjs backend",
+    "frontend": "node scripts/resmatic-cli.cjs frontend",
+    "e2e": "node scripts/resmatic-cli.cjs e2e",
+    "prisma:generate": "node scripts/resmatic-cli.cjs prisma:generate",
+    "prisma:migrate": "node scripts/resmatic-cli.cjs prisma:migrate",
+    "prisma:seed": "node scripts/resmatic-cli.cjs prisma:seed",
+    "cli": "node scripts/resmatic-cli.cjs"
+  }
+}
