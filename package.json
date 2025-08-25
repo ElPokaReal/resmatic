@@ -4,10 +4,16 @@
   "scripts": {
     "backend": "node scripts/resmatic-cli.cjs backend",
     "frontend": "node scripts/resmatic-cli.cjs frontend",
+    "dev:full": "node scripts/resmatic-cli.cjs dev:full",
+    "open:local": "node scripts/resmatic-cli.cjs abrir-localhost",
     "e2e": "node scripts/resmatic-cli.cjs e2e",
     "prisma:generate": "node scripts/resmatic-cli.cjs prisma:generate",
     "prisma:migrate": "node scripts/resmatic-cli.cjs prisma:migrate",
     "prisma:seed": "node scripts/resmatic-cli.cjs prisma:seed",
-    "cli": "node scripts/resmatic-cli.cjs"
+    "prisma:flow": "node scripts/resmatic-cli.cjs prisma:flow",
+    "prisma:studio": "node scripts/resmatic-cli.cjs prisma:studio",
+    "prisma:doctor": "node scripts/resmatic-cli.cjs prisma:doctor",
+    "cli": "node scripts/resmatic-cli.cjs",
+    "menu": "node scripts/resmatic-cli.cjs menu"
   }
 }

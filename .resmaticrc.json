@@ -1,0 +1,18 @@
+{
+  "terminal": "auto",
+  "windows_terminal": {
+    "layout": "panes",
+    "titlePrefix": "ResMatic - "
+  },
+  "profile": "dev",
+  "profiles": {
+    "dev": {
+      "envFile": ".env.dev",
+      "env": {
+        "NODE_ENV": "development"
+      }
+    }
+  },
+  "ports": { "frontend": 3000, "backend": 3001, "docsPath": "/docs" },
+  "autoOpen": ["frontend", "backend", "docs"]
+}

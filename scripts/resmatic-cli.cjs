@@ -13,88 +13,63 @@
 //   prisma:seed         Ejecutar Prisma Seed
 
 const path = require('path');
-const os = require('os');
 const { spawn } = require('child_process');
+const { root, serverDir, appDir, readConfig, hasWindowsTerminal, getProfileEnv } = require('./cli/config.cjs');
+const { printBanner, RESET, BOLD } = require('./cli/banner.cjs');
+const { openUrl, waitForHttp, openWhenReady } = require('./cli/utils.cjs');
+const { launchInWindowsTerminal, launchInNewTerminal, launchWTWithPanes } = require('./cli/launcher.cjs');
+const { interactiveMenu } = require('./cli/menu.cjs');
+const { TASKS } = require('./cli/tasks.cjs');
 
-// --- Banner minimal inspirado en scripts/banner.cjs ---
-const RESET = '\x1b[0m';
-const BOLD = '\x1b[1m';
-const CYAN = '\x1b[36m';
-const MAGENTA = '\x1b[35m';
-const YELLOW = '\x1b[33m';
-const GREEN = '\x1b[32m';
-const BRIGHT_WHITE = '\x1b[97m';
-const BRIGHT_CYAN = '\x1b[96m';
+// Estado global para saber si estamos en modo menú interactivo
+let INTERACTIVE = false;
+const IS_WIN = process.platform === 'win32';
 
-const BOX_WIDTH = 64;
-const INNER = BOX_WIDTH - 2;
-const stripAnsi = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
-const header = `${BOLD}${CYAN}╔${'═'.repeat(INNER)}╗${RESET}`;
-const footer = `${BOLD}${CYAN}╚${'═'.repeat(INNER)}╝${RESET}`;
-const box = (s = '') => {
-  const visible = stripAnsi(s);
-  const len = visible.length;
-  const left = Math.max(0, Math.floor((INNER - len) / 2));
-  const right = Math.max(0, INNER - len - left);
-  return `${BOLD}${CYAN}║${RESET}` + ' '.repeat(left) + s + ' '.repeat(right) + `${BOLD}${CYAN}║${RESET}`;
-};
+// Banner importado desde scripts/cli/banner.cjs
 
-const PIZZA = [
-  `        _....._`,
-  `    _.:\`.--|--.\`:_`,
-  `  .: .'\\o ^ | o*/~'. '.`,
-  ` // '.  \\ o| ^/  o* x'.\\`,
-  `//'._o'. \\ |o/ o^~_.-'o*\\\\`,
-  `|| o* '-.'.\\|/.-' o ^ x ||`,
-  `||--o-^o-*~->|`,
-];
-const maxPizzaWidth = Math.max(...PIZZA.map((l) => l.length));
-const pizzaLeft = Math.max(0, Math.floor((INNER - maxPizzaWidth) / 2));
-const colorizePizza = (line) => line
-  .replace(/o/g, `${YELLOW}o${RESET}`)
-  .replace(/\^/g, `${GREEN}^${RESET}`)
-  .replace(/\*/g, `${MAGENTA}*${RESET}`);
-const boxLeft = (s = '', leftPadding = 0) => {
-  const visible = stripAnsi(s);
-  const len = visible.length;
-  const left = Math.max(0, leftPadding);
-  const right = Math.max(0, INNER - left - len);
-  return `${BOLD}${CYAN}║${RESET}` + ' '.repeat(left) + s + ' '.repeat(right) + `${BOLD}${CYAN}║${RESET}`;
-};
-
-function printBanner(title, subtitle) {
-  const nets = os.networkInterfaces();
-  const lan = Object.values(nets).flatMap((ifs) => ifs || []).find((i) => i && i.family === 'IPv4' && !i.internal)?.address;
-  const lines = [
-    '',
-    header,
-    box(`${BRIGHT_CYAN}┌──────────────────┐${RESET}`),
-    box(`${BRIGHT_CYAN}│  ${BOLD}${BRIGHT_WHITE}RESMATIC${RESET}  ${BRIGHT_CYAN}     │${RESET}`),
-    box(`${BRIGHT_CYAN}└──────────────────┘${RESET}`),
-    box(`${BOLD}${BRIGHT_WHITE}RESMATIC CLI${RESET}`),
-    box(`${MAGENTA}${title}${RESET}`),
-    box(`${YELLOW}${subtitle || ''}${RESET}`),
-    box(),
-    ...PIZZA.map((l) => boxLeft(colorizePizza(l), pizzaLeft)),
-    footer,
-    '',
-  ];
-  console.log(lines.join('\n'));
+// Lanza el flujo guiado de Prisma en nueva ventana (Windows)
+function launchPrismaFlowNewTerminal() {
+  const wd = serverDir;
+  if (IS_WIN) {
+    const ps = 'powershell';
+    const wdQuoted = wd.replace(/'/g, "''");
+    const envVars = getProfileEnv();
+    const envPrefix = Object.entries(envVars).map(([k,v]) => `$env:${k}='${String(v).replace(/'/g, "''")}';`).join(' ');
+    const bunHome = process.env.BUN_INSTALL || (process.env.USERPROFILE ? `${process.env.USERPROFILE}\\.bun` : '');
+    const bunBin = bunHome ? `${bunHome}\\bin` : '';
+    const bunPathFix = bunBin ? `$env:Path=\"$env:Path;${bunBin.replace(/\\/g, '\\\\')}\"; ` : '';
+    const scriptParts = [
+      `${envPrefix} ${bunPathFix}Set-Location -LiteralPath '${wdQuoted}'`,
+      `Write-Host 'Prisma Flow: generate → migrate → seed' -ForegroundColor Cyan`,
+      `Write-Host ''`,
+      `Read-Host 'Paso 1: prisma:generate (Enter para continuar)'`,
+      `bun run prisma:generate`,
+      `if ($LASTEXITCODE -ne 0) { Write-Host 'Error en generate' -ForegroundColor Red; exit $LASTEXITCODE }`,
+      `Read-Host 'Paso 2: prisma:migrate (Enter para continuar)'`,
+      `bun run prisma:migrate`,
+      `if ($LASTEXITCODE -ne 0) { Write-Host 'Error en migrate' -ForegroundColor Red; exit $LASTEXITCODE }`,
+      `Read-Host 'Paso 3: prisma:seed (Enter para continuar)'`,
+      `bun run prisma:seed`,
+      `if ($LASTEXITCODE -ne 0) { Write-Host 'Error en seed' -ForegroundColor Red; exit $LASTEXITCODE }`,
+      `Write-Host 'Flujo completado ✅' -ForegroundColor Green`
+    ];
+    const psCommand = scriptParts.join('; ');
+    const child = spawn('cmd', ['/c', 'start', '', ps, '-NoExit', '-NoLogo', '-NoProfile', '-Command', psCommand], {
+      stdio: 'ignore',
+      detached: true,
+      shell: true,
+    });
+    child.unref();
+  } else {
+    // Otros SO: ejecutar en background sin pausas (el usuario puede abrir una terminal manualmente si quiere interacción)
+    const shell = process.platform === 'darwin' ? 'bash' : 'sh';
+    const cmd = `cd '${wd}'; echo 'Prisma Flow: generate → migrate → seed'; bun run prisma:generate && bun run prisma:migrate && bun run prisma:seed && echo 'Flujo completado ✅'`;
+    const child = spawn(shell, ['-lc', cmd], { stdio: 'ignore', detached: true, shell: true });
+    child.unref();
+  }
 }
 
-// --- Mapeo de tareas ---
-const root = path.join(__dirname, '..');
-const serverDir = path.join(root, 'resmatic-server');
-const appDir = path.join(root, 'resmatic-app');
-
-const TASKS = {
-  'e2e': { cwd: serverDir, cmd: 'bun', args: ['run', 'test:e2e'] },
-  'backend': { cwd: serverDir, cmd: 'bun', args: ['run', 'start:dev'] },
-  'frontend': { cwd: appDir, cmd: 'bun', args: ['run', 'dev'] },
-  'prisma:generate': { cwd: serverDir, cmd: 'bun', args: ['run', 'prisma:generate'] },
-  'prisma:migrate': { cwd: serverDir, cmd: 'bun', args: ['run', 'prisma:migrate'] },
-  'prisma:seed': { cwd: serverDir, cmd: 'bun', args: ['run', 'prisma:seed'] },
-};
+// --- Mapeo de tareas importado desde scripts/cli/tasks.cjs ---
 
 function usage() {
   console.log(`\n${BOLD}Uso:${RESET} node scripts/resmatic-cli.cjs <comando>\n`);
@@ -104,11 +79,27 @@ function usage() {
   console.log('  node scripts/resmatic-cli.cjs backend');
   console.log('  node scripts/resmatic-cli.cjs frontend');
   console.log('  node scripts/resmatic-cli.cjs e2e');
+  console.log('  node scripts/resmatic-cli.cjs abrir-localhost');
   console.log('  node scripts/resmatic-cli.cjs prisma:generate');
+  console.log('  node scripts/resmatic-cli.cjs prisma:flow');
+  console.log('  node scripts/resmatic-cli.cjs prisma:studio');
+  console.log('  node scripts/resmatic-cli.cjs prisma:doctor');
+  console.log('  node scripts/resmatic-cli.cjs dev:full');
   console.log('');
 }
+// Menú interactivo importado desde scripts/cli/menu.cjs
 
-function runTask(name) {
+// Launcher importado desde scripts/cli/launcher.cjs
+
+function openLocalUrls() {
+  const cfg = readConfig();
+  const f = `http://localhost:${cfg.ports.frontend}`;
+  const b = `http://localhost:${cfg.ports.backend}`;
+  const d = `${b}${cfg.ports.docsPath}`;
+  [f, b, d].forEach((u) => openUrl(u));
+}
+
+function runTask(name, opts = { detached: false }) {
   const t = TASKS[name];
   if (!t) {
     usage();
@@ -116,8 +107,81 @@ function runTask(name) {
     return;
   }
 
-  printBanner(`Ejecutando: ${name}`, `${t.cwd.replace(root + path.sep, '')}`);
+  // Acción especial para abrir URLs locales
+  if (name === 'abrir-localhost') {
+    openLocalUrls();
+    if (!INTERACTIVE && !opts.detached) process.exit(0);
+    return;
+  }
 
+  // Flujo guiado Prisma
+  if (name === 'prisma:flow') {
+    if (opts.detached || INTERACTIVE) {
+      printBanner('Lanzando: prisma:flow', 'resmatic-server');
+      launchPrismaFlowNewTerminal();
+      return;
+    }
+    // Modo directo: ejecutar en la misma ventana, secuencialmente
+    if (IS_WIN) {
+      const ps = 'powershell';
+      const wdQuoted = (serverDir || process.cwd()).replace(/'/g, "''");
+      const bunHome = process.env.BUN_INSTALL || (process.env.USERPROFILE ? `${process.env.USERPROFILE}\\.bun` : '');
+      const bunBin = bunHome ? `${bunHome}\\bin` : '';
+      const bunPathFix = bunBin ? `$env:Path=\"$env:Path;${bunBin.replace(/\\/g, '\\\\')}\"; ` : '';
+      const psCommand = `${bunPathFix}Set-Location -LiteralPath '${wdQuoted}'; bun run prisma:generate; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; bun run prisma:migrate; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; bun run prisma:seed`;
+      const child = spawn(ps, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand], {
+        stdio: 'inherit',
+        shell: true,
+      });
+      child.on('exit', (code) => process.exit(code ?? 0));
+      return;
+    } else {
+      const shell = process.platform === 'darwin' ? 'bash' : 'sh';
+      const cmd = `cd '${serverDir}'; set -e; bun run prisma:generate; bun run prisma:migrate; bun run prisma:seed`;
+      const child = spawn(shell, ['-lc', cmd], { stdio: 'inherit', shell: true });
+      child.on('exit', (code) => process.exit(code ?? 0));
+      return;
+    }
+  }
+
+  // Tarea compuesta: dev:full (lanza backend y frontend y abre URLs cuando estén listas)
+  if (name === 'dev:full') {
+    const cfg = readConfig();
+    const backend = TASKS['backend'];
+    const frontend = TASKS['frontend'];
+    const titlePrefix = (cfg.windows_terminal && cfg.windows_terminal.titlePrefix) || 'ResMatic - ';
+    const envVars = getProfileEnv();
+    printBanner('Lanzando: dev:full', 'backend + frontend');
+    const preferWT = cfg.terminal === 'windows_terminal' || (cfg.terminal === 'auto' && hasWindowsTerminal());
+    if (preferWT && hasWindowsTerminal() && (cfg.windows_terminal.layout === 'panes')) {
+      // Abrir ambos en un solo tab dividido en paneles
+      launchWTWithPanes(backend, `${titlePrefix}backend`, frontend, `${titlePrefix}frontend`, 'H', envVars, envVars);
+    } else {
+      // Abrir en nuevas pestañas/ventanas
+      launchInNewTerminal(backend, `${titlePrefix}backend`, envVars);
+      launchInNewTerminal(frontend, `${titlePrefix}frontend`, envVars);
+    }
+    // Solo en modo interactivo hacemos auto-open con health-check
+    if (INTERACTIVE) {
+      if (cfg.autoOpen.includes('frontend')) openWhenReady(`http://localhost:${cfg.ports.frontend}`);
+      if (cfg.autoOpen.includes('backend')) openWhenReady(`http://localhost:${cfg.ports.backend}`);
+      if (cfg.autoOpen.includes('docs')) openWhenReady(`http://localhost:${cfg.ports.backend}${cfg.ports.docsPath}`);
+    }
+    return;
+  }
+
+  if (opts.detached || INTERACTIVE) {
+    // No bloquear ni heredar stdio; abrir en nueva ventana
+    const cfg = readConfig();
+    const titlePrefix = (cfg.windows_terminal && cfg.windows_terminal.titlePrefix) || 'ResMatic - ';
+    const envVars = getProfileEnv();
+    printBanner(`Lanzando: ${name}`, `${t.cwd ? t.cwd.replace(root + path.sep, '') : ''}`);
+    launchInNewTerminal(t, `${titlePrefix}${name}`, envVars);
+    return;
+  }
+
+  // Modo directo (no interactivo): ejecutar en la misma ventana como antes
+  printBanner(`Ejecutando: ${name}`, `${t.cwd ? t.cwd.replace(root + path.sep, '') : ''}`);
   const child = spawn(t.cmd, t.args, {
     cwd: t.cwd,
     stdio: 'inherit',
@@ -136,7 +200,10 @@ function runTask(name) {
 }
 
 const [, , taskName] = process.argv;
-if (!taskName) {
+if (!taskName || taskName === 'menu' || taskName === 'interactive') {
+  INTERACTIVE = true;
+  interactiveMenu(runTask);
+} else if (taskName === 'help' || taskName === '--help' || taskName === '-h') {
   usage();
   process.exit(0);
 } else {
