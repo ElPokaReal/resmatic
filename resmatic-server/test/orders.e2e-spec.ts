@@ -35,9 +35,13 @@ describe('Orders E2E', () => {
   // Test staff who will be invited to restaurant as WAITER
   const staffEmail = 'waiter-orders@resmatic.local';
   const staffPassword = 'pass1234!';
+  // Test staff who will be invited as MANAGER
+  const managerEmail = 'manager-orders@resmatic.local';
+  const managerPassword = 'pass1234!';
 
   let adminAccess = '';
   let staffAccess = '';
+  let managerAccess = '';
   let restaurantId = '';
   let menuId = '';
   let sectionId = '';
@@ -79,6 +83,17 @@ describe('Orders E2E', () => {
     } else {
       await prisma.user.update({ where: { email: staffEmail }, data: { passwordHash } });
     }
+
+    // Ensure manager user exists with known password
+    const managerPasswordHash = await bcrypt.hash(managerPassword, 10);
+    const existingManager = await prisma.user.findUnique({ where: { email: managerEmail } });
+    if (!existingManager) {
+      await prisma.user.create({
+        data: { email: managerEmail, name: 'Orders Manager', passwordHash: managerPasswordHash, role: 'USER' as any },
+      });
+    } else {
+      await prisma.user.update({ where: { email: managerEmail }, data: { passwordHash: managerPasswordHash } });
+    }
   });
 
   afterAll(async () => {
@@ -104,6 +119,13 @@ describe('Orders E2E', () => {
       if (staff) {
         await prisma.refreshToken.deleteMany({ where: { userId: staff.id } }).catch(() => void 0);
         await prisma.user.delete({ where: { id: staff.id } }).catch(() => void 0);
+      }
+
+      // Remove test manager user
+      const manager = await prisma.user.findUnique({ where: { email: managerEmail } });
+      if (manager) {
+        await prisma.refreshToken.deleteMany({ where: { userId: manager.id } }).catch(() => void 0);
+        await prisma.user.delete({ where: { id: manager.id } }).catch(() => void 0);
       }
     } finally {
       await prisma.$disconnect();
@@ -388,6 +410,65 @@ describe('Orders E2E', () => {
       .expect(403);
   });
 
+  it('rbac: invite staff as MANAGER and allow updating order', async () => {
+    // Owner invites MANAGER
+    const invite = await request(app.getHttpServer())
+      .post(`${restaurantsBase}/${restaurantId}/invites`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ email: managerEmail, tenantRole: 'MANAGER' })
+      .expect(201);
+
+    // Manager login
+    const login = await request(app.getHttpServer())
+      .post(`${authBase}/login`)
+      .send({ email: managerEmail, password: managerPassword })
+      .expect(200);
+    managerAccess = login.body.accessToken;
+
+    // Accept invite
+    await request(app.getHttpServer())
+      .post(`${invitesBase}/accept`)
+      .set('Authorization', `Bearer ${managerAccess}`)
+      .send({ token: invite.body.token })
+      .expect(201);
+
+    // Manager updates existing order
+    const res = await request(app.getHttpServer())
+      .patch(`${ordersBase(restaurantId)}/${orderId}`)
+      .set('Authorization', `Bearer ${managerAccess}`)
+      .send({ notes: 'Updated by manager' })
+      .expect(200);
+    expect(res.body).toHaveProperty('notes', 'Updated by manager');
+  });
+
+  it('rbac: manager can add and delete an item in the order', async () => {
+    // Add item
+    const addRes = await request(app.getHttpServer())
+      .post(`${ordersBase(restaurantId)}/${orderId}/items`)
+      .set('Authorization', `Bearer ${managerAccess}`)
+      .send({ menuItemId: itemId, quantity: 1 })
+      .expect(201);
+    expect(addRes.body).toHaveProperty('id');
+
+    // Fetch last created item id
+    const createdItem = await prisma.orderItem.findFirst({ where: { orderId }, orderBy: { createdAt: 'desc' } });
+    const orderItemId = createdItem!.id;
+
+    // Delete item
+    const delRes = await request(app.getHttpServer())
+      .delete(`${ordersBase(restaurantId)}/${orderId}/items/${orderItemId}`)
+      .set('Authorization', `Bearer ${managerAccess}`)
+      .expect(200);
+    expect(delRes.body).toHaveProperty('ok', true);
+  });
+
+  it('rbac: manager cannot list orders for other restaurant -> 403', async () => {
+    await request(app.getHttpServer())
+      .get(ordersBase(restaurantId2))
+      .set('Authorization', `Bearer ${managerAccess}`)
+      .expect(403);
+  });
+
   it('negative: no auth returns 401 on list orders', async () => {
     await request(app.getHttpServer()).get(ordersBase(restaurantId)).expect(401);
   });
@@ -451,6 +532,87 @@ describe('Orders E2E', () => {
       .post(`${ordersBase(restaurantId)}/${orderId}/items`)
       .set('Authorization', `Bearer ${adminAccess}`)
       .send({ menuItemId: itemOtherRestaurantId, quantity: 1 })
+      .expect(404);
+  });
+  
+  it('negative: change status with invalid enum -> 400', async () => {
+    await request(app.getHttpServer())
+      .post(`${ordersBase(restaurantId)}/${orderId}/status`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ status: 'INVALID_STATUS', message: 'bad' })
+      .expect(400);
+  });
+
+  it('negative: change status on wrong orderId -> 404', async () => {
+    await request(app.getHttpServer())
+      .post(`${ordersBase(restaurantId)}/ck_fake_order_id/status`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ status: 'CONFIRMED' })
+      .expect(404);
+  });
+
+  it('negative: update order with tableNumber 0 -> 400', async () => {
+    // create fresh order
+    const resOrder = await request(app.getHttpServer())
+      .post(ordersBase(restaurantId))
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ tableNumber: 2 })
+      .expect(201);
+    const oid = resOrder.body.id;
+
+    await request(app.getHttpServer())
+      .patch(`${ordersBase(restaurantId)}/${oid}`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ tableNumber: 0 })
+      .expect(400);
+  });
+
+  it('negative: update order item with sortOrder -1 -> 400', async () => {
+    // prepare order with an item
+    const oRes = await request(app.getHttpServer())
+      .post(ordersBase(restaurantId))
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ tableNumber: 13 })
+      .expect(201);
+    const oid = oRes.body.id;
+
+    const addRes = await request(app.getHttpServer())
+      .post(`${ordersBase(restaurantId)}/${oid}/items`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ menuItemId: itemId, quantity: 1 })
+      .expect(201);
+    expect(addRes.body.id).toBeDefined();
+
+    const createdItem = await prisma.orderItem.findFirst({ where: { orderId: oid }, orderBy: { createdAt: 'asc' } });
+    const oidItem = createdItem!.id;
+
+    await request(app.getHttpServer())
+      .patch(`${ordersBase(restaurantId)}/${oid}/items/${oidItem}`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ sortOrder: -1 })
+      .expect(400);
+  });
+
+  it('negative: delete item with wrong id -> 404', async () => {
+    await request(app.getHttpServer())
+      .delete(`${ordersBase(restaurantId)}/${orderId}/items/ck_fake_orit_id`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .expect(404);
+  });
+
+  it('negative: add item with too long note (>500) -> 400', async () => {
+    const longNote = 'x'.repeat(501);
+    await request(app.getHttpServer())
+      .post(`${ordersBase(restaurantId)}/${orderId}/items`)
+      .set('Authorization', `Bearer ${adminAccess}`)
+      .send({ menuItemId: itemId, quantity: 1, note: longNote })
+      .expect(400);
+  });
+
+  it('negative: list events with wrong orderId -> 404', async () => {
+    await request(app.getHttpServer())
+      .get(`${ordersBase(restaurantId)}/ck_fake_order_id/events`)
+      .set('Authorization', `Bearer ${adminAccess}`)
       .expect(404);
   });
 });

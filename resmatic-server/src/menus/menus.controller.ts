@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { ApiBadRequestResponse, ApiBearerAuth, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { ApiBadRequestResponse, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RestaurantAccessGuard } from '../restaurants/guards/restaurant-access.guard';
 import { RestaurantRoles } from '../restaurants/decorators/restaurant-roles.decorator';
@@ -45,6 +45,13 @@ export class MenusController {
   @ApiUnauthorizedResponse()
   @ApiBadRequestResponse()
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
+  @ApiBody({
+    type: CreateMenuDto,
+    examples: {
+      simple: { summary: 'Crear menú básico', value: { name: 'Principal' } },
+      full: { summary: 'Crear menú completo', value: { name: 'Desayunos', description: 'De 7am a 11am', sortOrder: 1, isActive: true } },
+    },
+  })
   create(@Param('id') id: string, @Body() dto: CreateMenuDto) {
     return this.service.createMenu(id, dto);
   }
@@ -73,6 +80,14 @@ export class MenusController {
   @ApiNotFoundResponse()
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
   @ApiParam({ name: 'menuId', example: 'ckv9h1menu0000xyz123' })
+  @ApiBody({
+    type: UpdateMenuDto,
+    examples: {
+      activate: { summary: 'Activar menú', value: { isActive: true } },
+      reorder: { summary: 'Cambiar sortOrder', value: { sortOrder: 2 } },
+      rename: { summary: 'Renombrar y describir', value: { name: 'Carta', description: 'Actualizada' } },
+    },
+  })
   update(@Param('id') id: string, @Param('menuId') menuId: string, @Body() dto: UpdateMenuDto) {
     const data: Prisma.MenuUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
@@ -121,6 +136,13 @@ export class MenusController {
   @ApiNotFoundResponse()
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
   @ApiParam({ name: 'menuId', example: 'ckv9h1menu0000xyz123' })
+  @ApiBody({
+    type: CreateSectionDto,
+    examples: {
+      simple: { summary: 'Sección básica', value: { name: 'Entradas' } },
+      full: { summary: 'Sección completa', value: { name: 'Bebidas', description: 'Frías y calientes', sortOrder: 0, isActive: true } },
+    },
+  })
   createSection(@Param('id') id: string, @Param('menuId') menuId: string, @Body() dto: CreateSectionDto) {
     return this.service.createSection(id, menuId, dto);
   }
@@ -151,6 +173,14 @@ export class MenusController {
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
   @ApiParam({ name: 'menuId', example: 'ckv9h1menu0000xyz123' })
   @ApiParam({ name: 'sectionId', example: 'ckv9h1sect0000xyz123' })
+  @ApiBody({
+    type: UpdateSectionDto,
+    examples: {
+      activate: { summary: 'Activar sección', value: { isActive: true } },
+      reorder: { summary: 'Cambiar sortOrder', value: { sortOrder: 3 } },
+      rename: { summary: 'Renombrar', value: { name: 'Platos fuertes' } },
+    },
+  })
   updateSection(
     @Param('id') id: string,
     @Param('menuId') menuId: string,
@@ -207,6 +237,13 @@ export class MenusController {
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
   @ApiParam({ name: 'menuId', example: 'ckv9h1menu0000xyz123' })
   @ApiParam({ name: 'sectionId', example: 'ckv9h1sect0000xyz123' })
+  @ApiBody({
+    type: CreateItemDto,
+    examples: {
+      simple: { summary: 'Ítem básico', value: { name: 'Hamburguesa clásica', price: 9.99 } },
+      full: { summary: 'Ítem completo', value: { name: 'Limonada', description: 'Natural', price: 2.5, tags: ['bebida'], sortOrder: 0, status: 'ACTIVE' } },
+    },
+  })
   createItem(
     @Param('id') id: string,
     @Param('menuId') menuId: string,
@@ -249,6 +286,15 @@ export class MenusController {
   @ApiParam({ name: 'menuId', example: 'ckv9h1menu0000xyz123' })
   @ApiParam({ name: 'sectionId', example: 'ckv9h1sect0000xyz123' })
   @ApiParam({ name: 'itemId', example: 'ckv9h1item0000xyz123' })
+  @ApiBody({
+    type: UpdateItemDto,
+    examples: {
+      price: { summary: 'Actualizar precio', value: { price: 10.5 } },
+      status: { summary: 'Cambiar estado', value: { status: 'INACTIVE' } },
+      reorder: { summary: 'Reordenar', value: { sortOrder: 2 } },
+      rename: { summary: 'Renombrar', value: { name: 'Cheeseburger' } },
+    },
+  })
   updateItem(
     @Param('id') id: string,
     @Param('menuId') menuId: string,

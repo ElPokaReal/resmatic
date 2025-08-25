@@ -19,7 +19,11 @@ Fecha: 2025-08-25
 - Swagger/Orders: `total` (Order) y `unitPrice` (OrderItem) documentados como string con ejemplos en DTOs.
 - CI backend: workflow `.github/workflows/backend-ci.yml` con Bun (lint, migraciones, seed, E2E contra Postgres de servicio).
 - Dockerfile producción backend: `resmatic-server/Dockerfile` multi-stage (build + runtime) con `prisma generate` y `nest build`.
--
+- Suscripciones (Backend):
+  - Modelos Prisma `Plan`, `Subscription`, `UsageCounter`.
+  - Módulo Nest `src/subscriptions/*` (controllers, services, DTOs).
+  - Endpoints implementados: `GET /plans`, `GET /restaurants/:id/subscription`, `POST /restaurants/:id/subscription`, `PATCH /restaurants/:id/subscription/status`, `GET /restaurants/:id/subscription/usage`, `POST /restaurants/:id/subscription/usage/increment`.
+  - E2E: `resmatic-server/test/subscriptions.e2e-spec.ts` cubriendo alta/cancelación/reactivación, RBAC/Scoping y contadores de uso.
 
 ## En curso
 - Menú/Carta: CRUD de `Menu`/`MenuSection`/`MenuItem` (backend) en `src/menus/`.
@@ -27,7 +31,7 @@ Fecha: 2025-08-25
 - Orders E2E: ampliación de casos negativos (400/404/403) y preparación de transiciones de estado y recálculo de totales.
 
 ## Próximos pasos
-- Suscripciones (backend): `Plan`, `Subscription`, `UsageCounter` + enforcement de límites.
+- Enforcement de límites de Suscripciones: validación de límites por plan antes de crear recursos.
 - Deploy/Entornos: preparar staging y pipeline de deploy (migrate deploy en release) y publicación de imágenes.
 
 ## Endpoints de Orders (v1)

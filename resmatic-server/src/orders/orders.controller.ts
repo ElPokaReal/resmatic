@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiBearerAuth, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { ApiBadRequestResponse, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RestaurantAccessGuard } from '../restaurants/guards/restaurant-access.guard';
 import { RestaurantRoles } from '../restaurants/decorators/restaurant-roles.decorator';
@@ -42,6 +42,19 @@ export class OrdersController {
   @ApiUnauthorizedResponse()
   @ApiBadRequestResponse()
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
+  @ApiBody({
+    type: CreateOrderDto,
+    examples: {
+      simple: {
+        summary: 'Orden simple',
+        value: { tableNumber: 5, customerName: 'Alice', notes: 'Sin cebolla' },
+      },
+      minimal: {
+        summary: 'Sólo mesa',
+        value: { tableNumber: 12 },
+      },
+    },
+  })
   create(@Param('id') id: string, @Body() dto: CreateOrderDto) {
     return this.service.create(id, dto);
   }
@@ -70,6 +83,13 @@ export class OrdersController {
   @ApiNotFoundResponse()
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
   @ApiParam({ name: 'orderId', example: 'ckv9h1orde0000xyz123' })
+  @ApiBody({
+    type: UpdateOrderDto,
+    examples: {
+      notes: { summary: 'Actualizar notas', value: { notes: 'Preparar sin sal' } },
+      tableAndCustomer: { summary: 'Actualizar mesa y cliente', value: { tableNumber: 3, customerName: 'Carlos' } },
+    },
+  })
   update(@Param('id') id: string, @Param('orderId') orderId: string, @Body() dto: UpdateOrderDto) {
     const data: Prisma.OrderUpdateInput = {};
     if (dto.tableNumber !== undefined) data.tableNumber = dto.tableNumber;
@@ -89,6 +109,16 @@ export class OrdersController {
   @ApiNotFoundResponse()
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
   @ApiParam({ name: 'orderId', example: 'ckv9h1orde0000xyz123' })
+  @ApiBody({
+    type: ChangeStatusDto,
+    examples: {
+      confirm: { summary: 'Confirmar', value: { status: 'CONFIRMED', message: 'Cliente confirmó' } },
+      progress: { summary: 'En progreso', value: { status: 'IN_PROGRESS' } },
+      ready: { summary: 'Listo', value: { status: 'READY', message: 'Listo para servir' } },
+      complete: { summary: 'Completado', value: { status: 'COMPLETED' } },
+      cancel: { summary: 'Cancelado', value: { status: 'CANCELED', message: 'Cliente se retiró' } },
+    },
+  })
   changeStatus(@Param('id') id: string, @Param('orderId') orderId: string, @Body() dto: ChangeStatusDto) {
     return this.service.changeStatus(id, orderId, dto.status as any, dto.message);
   }
@@ -117,6 +147,15 @@ export class OrdersController {
   @ApiNotFoundResponse()
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
   @ApiParam({ name: 'orderId', example: 'ckv9h1orde0000xyz123' })
+  @ApiBody({
+    type: CreateOrderItemDto,
+    examples: {
+      simple: {
+        summary: 'Agregar ítem básico',
+        value: { menuItemId: 'ckv9h1item0000xyz123', quantity: 2, note: 'Poco hecho' },
+      },
+    },
+  })
   addItem(@Param('id') id: string, @Param('orderId') orderId: string, @Body() dto: CreateOrderItemDto) {
     return this.service.addItem(id, orderId, dto);
   }
@@ -133,6 +172,14 @@ export class OrdersController {
   @ApiParam({ name: 'id', example: 'ckv9h1rest0000xyz123' })
   @ApiParam({ name: 'orderId', example: 'ckv9h1orde0000xyz123' })
   @ApiParam({ name: 'orderItemId', example: 'ckv9h1orit0000xyz123' })
+  @ApiBody({
+    type: UpdateOrderItemDto,
+    examples: {
+      qty: { summary: 'Cambiar cantidad', value: { quantity: 3 } },
+      note: { summary: 'Actualizar nota', value: { note: 'Sin gluten' } },
+      reorder: { summary: 'Reordenar', value: { sortOrder: 1 } },
+    },
+  })
   updateItem(
     @Param('id') id: string,
     @Param('orderId') orderId: string,

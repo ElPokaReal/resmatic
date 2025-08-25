@@ -21,8 +21,8 @@ Este roadmap cubre la evolución del backend para gestionar usuarios, restaurant
    - Modelos `Order`, `OrderItem`, `OrderEvent`. Endpoints para crear/actualizar estado y añadir ítems.
 3) Pruebas E2E negativas
    - RBAC por restaurante, validaciones y expiración de invitaciones.
-4) Suscripciones (solo backend)
-   - Modelos `Plan`, `Subscription`, `UsageCounter` y alambres básicos (sin pagos).
+4) Suscripciones (solo backend) — completado
+   - Modelos `Plan`, `Subscription`, `UsageCounter` y endpoints base implementados (sin pagos).
 5) Deploy y entornos
    - `.env` por entorno, Dockerfile, CI (lint/test/migrate) y staging.
 
@@ -38,6 +38,7 @@ Este roadmap cubre la evolución del backend para gestionar usuarios, restaurant
   - Swagger/Orders: montos `total` y `unitPrice` documentados como string en DTOs (`order.dto.ts`, `order-item.dto.ts`).
   - CI Backend: workflow `.github/workflows/backend-ci.yml` con Bun que corre lint, migraciones, seed y E2E contra Postgres de servicio.
   - Dockerfile de producción backend: `resmatic-server/Dockerfile` multi-stage (build + runtime) con Prisma generate y `nest build`.
+  - Suscripciones (Backend): módulo `src/subscriptions/*` con endpoints `GET /plans`, `GET/POST /restaurants/:id/subscription`, `PATCH /restaurants/:id/subscription/status`, `GET /restaurants/:id/subscription/usage`, `POST /restaurants/:id/subscription/usage/increment`; E2E `resmatic-server/test/subscriptions.e2e-spec.ts` cubriendo alta/cancelación/reactivación, RBAC, scoping y contadores de uso.
 - **[en curso]**
   - Menú y Carta: CRUD de `Menu`/`MenuSection`/`MenuItem` (backend) — en construcción.
   - Validaciones adicionales y ejemplos en Swagger para Orders.
@@ -131,7 +132,7 @@ Este roadmap cubre la evolución del backend para gestionar usuarios, restaurant
 ## Fase 5 — Suscripciones (Backend)
 - **Modelos Prisma**: `Plan` (límites: restaurantes, meseros, menús, pedidos concurrentes), `Subscription`, `UsageCounter`.
 - **Enforcement**: guard/interceptor que valide límites antes de crear recursos.
-- **Endpoints**: `GET /plans`, `GET/POST /subscriptions`. (Pagos se agregan en otra fase.)
+- **Endpoints implementados**: `GET /plans`, `GET /restaurants/:id/subscription`, `POST /restaurants/:id/subscription`, `PATCH /restaurants/:id/subscription/status`, `GET /restaurants/:id/subscription/usage`, `POST /restaurants/:id/subscription/usage/increment`. (Pagos se agregan en otra fase.)
 
 ## Fase 6 — Observabilidad, Calidad y DX
 - **Swagger**: tags por dominio, ejemplos, auth schemes.

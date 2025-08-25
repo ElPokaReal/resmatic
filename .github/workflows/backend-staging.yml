@@ -1,0 +1,91 @@
+name: backend-staging
+
+on:
+  push:
+    branches:
+      - staging
+    paths:
+      - 'resmatic-server/**'
+      - '.github/workflows/backend-staging.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Create .env for server (staging)
+        working-directory: resmatic-server
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+        run: |
+          cp .env.example .env
+          sed -i "s#^DATABASE_URL=.*#DATABASE_URL=${DATABASE_URL}#" .env
+          sed -i "s#^JWT_ACCESS_SECRET=.*#JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}#" .env || echo "JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}" >> .env
+          sed -i "s#^JWT_REFRESH_SECRET=.*#JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}#" .env || echo "JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}" >> .env
+
+      - name: Install dependencies
+        working-directory: resmatic-server
+        run: bun install --ci
+
+      - name: Generate Prisma Client
+        working-directory: resmatic-server
+        run: bun run prisma:generate
+
+      - name: Run migrations (deploy)
+        working-directory: resmatic-server
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: bun run prisma:migrate:deploy
+
+      - name: Seed database (optional)
+        if: ${{ secrets.RUN_STAGING_SEED == 'true' }}
+        working-directory: resmatic-server
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: bun run prisma:seed
+
+      - name: Run E2E tests against staging DB (optional)
+        if: ${{ secrets.RUN_STAGING_TESTS == 'true' }}
+        working-directory: resmatic-server
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: bun run test:e2e
+
+      # TODO: Replace this placeholder with your actual deployment step (e.g., Docker/K8s/Render/Heroku)
+      - name: Deploy to staging (placeholder)
+        run: |
+          echo "Add your deployment command here (e.g., kubectl apply, render-cli, heroku releases, etc.)"
+
+      - name: Wait for readiness
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+        run: |
+          if [ -z "$STAGING_URL" ]; then
+            echo "STAGING_URL secret is not set. Please configure it in repo settings." >&2
+            exit 1
+          fi
+          echo "Waiting for readiness at ${STAGING_URL}/api/v1/health/ready"
+          ATTEMPTS=60
+          SLEEP=5
+          for i in $(seq 1 $ATTEMPTS); do
+            STATUS=$(curl -fsS -o /dev/null -w "%{http_code}" "${STAGING_URL}/api/v1/health/ready" || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "Ready (HTTP 200)"
+              exit 0
+            fi
+            echo "Attempt $i/${ATTEMPTS}: Not ready yet (status=${STATUS:-curl_failed}), retrying in ${SLEEP}s..."
+            sleep $SLEEP
+          done
+          echo "Service did not become ready in time" >&2
+          exit 1

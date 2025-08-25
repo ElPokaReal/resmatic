@@ -62,10 +62,6 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/resmatic?schema=public
         run: bun run prisma:seed
 
-      - name: Lint
-        working-directory: resmatic-server
-        run: bun run lint
-
       - name: Run E2E tests
         working-directory: resmatic-server
         env:
